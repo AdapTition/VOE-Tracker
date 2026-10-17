@@ -25,6 +25,11 @@ def install_target(env: Mapping[str, str]) -> Path:
     return Path(env["LOCALAPPDATA"]) / APP_NAME / f"{APP_NAME}.exe"
 
 
+def _ps_quote(text: str) -> str:
+    """Body of a PowerShell single-quoted string: it also ends on ‘ ’ ‚ ‛, doubling escapes each."""
+    return "".join(c * 2 if c in "'\u2018\u2019\u201a\u201b" else c for c in text)
+
+
 def _run(cmd: list[str]) -> None:
     subprocess.run(cmd, check=False, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
 
@@ -33,11 +38,10 @@ def install_self(exe: Path, env: Mapping[str, str], run: Callable[[list[str]], N
     target = install_target(env)
     target.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(exe, target)
-    t = str(target).replace("'", "''")
     script = (
         "$d=[Environment]::GetFolderPath('Desktop');"
         "$s=(New-Object -ComObject WScript.Shell).CreateShortcut((Join-Path $d 'VOE Explorer.lnk'));"
-        f"$s.TargetPath='{t}';$s.WorkingDirectory='{str(target.parent).replace(chr(39), chr(39) * 2)}';$s.Save()"
+        f"$s.TargetPath='{_ps_quote(str(target))}';$s.WorkingDirectory='{_ps_quote(str(target.parent))}';$s.Save()"
     )
     run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script])
     return target

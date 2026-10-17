@@ -14,19 +14,38 @@ const ui = {
   lastText: "",
   healthWindow: "day",
   raw: { id: null, kind: "schedule", items: [], sel: 0, tab: "html" },
+  lastOk: 0,            // when get_state last answered
+  installError: null,
 };
+const NO_STATE_MS = 60000;   // no fresh state for this long: never keep showing the old status as current
 
 // ---------- polling ----------
+let ticking = false;
 async function tick() {
+  if (ticking) return;   // the previous call is still waiting for an answer
+  ticking = true;
   try {
     const s = await api().get_state();
-    if (s && !s.error) { ui.state = s; render(); }
+    if (s && !s.error) { ui.state = s; ui.lastOk = Date.now(); }
   } catch (e) { /* bridge not ready yet */ }
+  ticking = false;
+  if (ui.state) render();
+}
+setInterval(() => { if (ui.state && Date.now() - ui.lastOk > NO_STATE_MS) render(); }, 5000);
+
+// the app itself stopped answering: show every card as "could not update"
+function frozen(s) {
+  if (Date.now() - ui.lastOk <= NO_STATE_MS) return s;
+  return {
+    ...s,
+    health: { state: "unknown", text: "Перевіряємо VOE…" },
+    cards: s.cards.map((c) => ({ ...c, level: "stale", headline: "Не вдалося оновити", loading: false })),
+  };
 }
 
 // ---------- main render ----------
 function render() {
-  const s = ui.state;
+  const s = frozen(ui.state);
   const h = s.health || { state: "unknown", text: "Перевіряємо VOE…" };
   $("#health .dot").className = "dot " + h.state;
   $("#health .health-text").textContent = h.text;
@@ -38,8 +57,9 @@ function render() {
   }
   if (s.install_offer) {
     banners += `<div class="banner"><span>Програма запущена з тимчасової папки.</span>
-      <span><button class="link" data-act="dismiss-install">Не треба</button>
+      <span class="actions"><button class="link" data-act="dismiss-install">Не треба</button>
       <button data-act="install">Встановити на цей комп'ютер</button></span></div>`;
+    if (ui.installError) banners += `<div class="banner err"><span>Не вдалося встановити: ${esc(ui.installError)}</span></div>`;
   }
   $("#banners").innerHTML = banners;
 
@@ -137,7 +157,12 @@ document.addEventListener("click", async (e) => {
     case "days": ui.expanded.has(id) ? ui.expanded.delete(id) : ui.expanded.add(id); render(); break;
     case "legend": showLegend(t); break;
     case "update": api().open_url(t.dataset.url); break;
-    case "install": api().install_self(); break;
+    case "install": {
+      ui.installError = null;
+      const r = await api().install_self();
+      if (r && r.error) { ui.installError = r.error; render(); }
+      break;
+    }
     case "dismiss-install": await api().dismiss_install(); tick(); break;
   }
 });
@@ -252,8 +277,10 @@ function showResolution(res) {
     box.innerHTML = `<div class="msg">${esc(prettyStreet(street.value))}: ${res.house_choices.length ? "оберіть номер будинку" : "вкажіть номер будинку"}</div>
       <div class="choices grid">${res.house_choices.map((h, i) => `<button class="choice" data-i="${i}">${esc(h.value)}</button>`).join("")}</div>
       <label class="field" style="margin-top:10px">Інший номер<input id="f-house"></label>`;
-    box.querySelectorAll(".choice").forEach((b) => b.addEventListener("click", () =>
-      showResolution({ kind: "found", street, house: res.house_choices[+b.dataset.i] })));
+    box.querySelectorAll(".choice").forEach((b) => b.addEventListener("click", async () => {
+      const r = await api().pick_house(ui.city, street, res.house_choices[+b.dataset.i], ui.lastText);
+      showResolution(r);
+    }));
     $("#f-house").addEventListener("keydown", async (e) => {
       if (e.key !== "Enter") return;
       busy(true);

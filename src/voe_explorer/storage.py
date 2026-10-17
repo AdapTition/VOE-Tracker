@@ -6,13 +6,14 @@ import os
 import sqlite3
 import threading
 from dataclasses import asdict, dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from .models import SavedAddress
 from .net import FetchResult
 
 KEEP_CHANGES = 10
+KEEP_PROBE_DAYS = 30
 
 
 def _write_json(path: Path, data) -> None:
@@ -148,6 +149,22 @@ class Db:
         drop = [rid for rid, _ in rows if rid not in keep]
         if drop:
             self._con.executemany("DELETE FROM responses WHERE id = ?", [(d,) for d in drop])
+
+    def delete_responses(self, address_id: str) -> None:
+        with self._lock:
+            self._con.execute("DELETE FROM responses WHERE address_id = ?", (address_id,))
+            self._con.commit()
+
+    def prune(self, now: datetime, keep_address_ids: set[str], keep_days: int = KEEP_PROBE_DAYS) -> None:
+        """Drop probes older than keep_days and responses of addresses that are gone."""
+        with self._lock:
+            self._con.execute("DELETE FROM probes WHERE at < ?", ((now - timedelta(days=keep_days)).isoformat(),))
+            ids = list(keep_address_ids)
+            self._con.execute(
+                f"DELETE FROM responses WHERE address_id IS NOT NULL AND address_id NOT IN ({','.join('?' * len(ids))})",
+                ids)
+            self._con.commit()
+            self._con.execute("VACUUM")
 
     def _row(self, r) -> StoredResponse:
         return StoredResponse(r[0], r[1], r[2], datetime.fromisoformat(r[3]), r[4], r[5], r[6], r[7], r[8])

@@ -101,9 +101,10 @@ def parse_voe_street(value: str) -> StreetName:
         raw_kind, s = s.split(". ", 1)
         kind = KIND_SYNONYMS.get(raw_kind, raw_kind)
     ordinal = None
-    m = re.match(r"^(\d+)-?(й|ий|ій|а|я|е)\s+(.*)$", s)
+    # "1-й Ботанічний" and "8 Березня": a leading number is the ordinal, as in user queries
+    m = re.match(r"^(\d+)(?:-?(?:й|ий|ій|а|я|е))?\s+(\S.*)$", s)
     if m:
-        ordinal, s = int(m.group(1)), m.group(3)
+        ordinal, s = int(m.group(1)), m.group(2)
     return StreetName(kind, ordinal, s)
 
 

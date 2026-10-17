@@ -95,3 +95,31 @@ def test_add_address_refreshes_schedule_and_planned(tmp_path):
                           {"value": "вулиця. Стрілецька", "id": "1748"}, {"value": "16", "id": "38512"})
     assert done.wait(2)
     assert ("schedule", out["id"]) in calls and ("planned",) in calls
+
+
+
+class NotFoundResolver:
+    def resolve(self, text, city):
+        from voe_explorer.resolver import Resolution
+        return Resolution("not_found")
+
+
+def test_not_found_while_voe_down_says_voe_is_down(tmp_path):
+    from voe_explorer.health import Health
+    api, _, _ = make(tmp_path, resolver=NotFoundResolver())
+    api._service.check_voe = lambda: Health.DOWN
+    assert api.resolve("Неіснуюча 1", {"value": "м.. Вінниця", "id": "510100000"}) == {
+        "error": "Сайт VOE зараз не відповідає. Спробуйте ще раз за хвилину."}
+    api._service.check_voe = lambda: Health.OFFLINE
+    assert "інтернет" in api.resolve("Неіснуюча 1", {"value": "м.. Вінниця", "id": "510100000"})["error"]
+    api._service.check_voe = lambda: Health.OK
+    assert api.resolve("Неіснуюча 1", {"value": "м.. Вінниця", "id": "510100000"})["kind"] == "not_found"
+
+
+def test_remove_address_drops_its_responses(tmp_path):
+    api, db, store = make(tmp_path)
+    out = api.add_address("Батьки", {"value": "м.. Вінниця", "id": "510100000"},
+                          {"value": "вулиця. Стрілецька", "id": "1"}, {"value": "16", "id": "2"})
+    db.add_response(out["id"], "schedule", FetchResult("u", datetime(2026, 10, 17, 11), 200, 0.4, EMERGENCY, None), "h")
+    api.remove(out["id"])
+    assert db.responses(out["id"], "schedule") == []

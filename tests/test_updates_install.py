@@ -71,3 +71,14 @@ def test_same_day_cache_ignores_version_already_installed():
     assert cached_update(mem, "me/r", "0.2.0", "2026-10-17", no_fetch) is None
     # next day: fetched again
     assert cached_update(mem, "me/r", "0.2.0", "2026-10-18", fetch) is None
+
+
+
+def test_install_script_escapes_typographic_quotes(tmp_path):
+    exe = tmp_path / "VOE Explorer.exe"
+    exe.write_bytes(b"MZ")
+    env = {"LOCALAPPDATA": str(tmp_path / "O’Brien")}
+    commands = []
+    install_self(exe, env, commands.append)
+    script = commands[0][-1]
+    assert "O’’Brien" in script and "O’Brien\\" not in script

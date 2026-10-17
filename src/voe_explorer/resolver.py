@@ -67,8 +67,17 @@ class Resolver:
         # remember only if the text itself names this house, so the key never maps to another one
         typed = parse_query(remember_as).house if remember_as else None
         if typed and normalize_house(typed) == house:
-            self.memory.put(memory_key(city.id, remember_as), {
-                "street": {"value": street.item.value, "id": street.item.id},
-                "house": {"value": exact.value, "id": exact.id},
-            })
+            self._remember(city, remember_as, street, exact)
         return Resolution("found", street, exact)
+
+    def remember_pick(self, city: AcItem, text: str, street: StreetChoice, house: AcItem) -> Resolution:
+        """The user picked a house from the list offered for `text`: that is their answer to it."""
+        if text and parse_query(text).house:
+            self._remember(city, text, street, house)
+        return Resolution("found", street, house)
+
+    def _remember(self, city: AcItem, text: str, street: StreetChoice, house: AcItem) -> None:
+        self.memory.put(memory_key(city.id, text), {
+            "street": {"value": street.item.value, "id": street.item.id},
+            "house": {"value": house.value, "id": house.id},
+        })

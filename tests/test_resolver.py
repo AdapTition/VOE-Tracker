@@ -106,3 +106,22 @@ def test_other_house_is_not_remembered_under_original_text():
     client.calls.clear()
     again = r.resolve("1-й пров. Ботанічний 3", CITY)
     assert again.kind == "choose_house" and client.calls  # asked VOE again, no silent house 20
+
+
+
+def test_house_picked_from_list_is_remembered():
+    r, client = resolver()
+    res = r.resolve("1-й пров. Ботанічний 2б", CITY)
+    assert res.kind == "choose_house"
+    picked = r.remember_pick(CITY, "1-й пров. Ботанічний 2б", res.street, AcItem("20", "29420"))
+    assert picked.kind == "found" and picked.house == AcItem("20", "29420")
+    client.calls.clear()
+    again = r.resolve("1-й пров. Ботанічний 2б", CITY)
+    assert again.kind == "found" and again.house == AcItem("20", "29420") and not client.calls
+
+
+def test_pick_without_house_in_text_is_not_remembered():
+    r, client = resolver()
+    res = r.resolve("1-й пров. Ботанічний", CITY)
+    r.remember_pick(CITY, "1-й пров. Ботанічний", res.street, AcItem("20", "29420"))
+    assert r.resolve("1-й пров. Ботанічний", CITY).kind == "choose_house"

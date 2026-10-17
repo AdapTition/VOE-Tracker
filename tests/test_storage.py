@@ -70,3 +70,20 @@ def test_save_sample_writes_utf8(tmp_path):
     p = save_sample(tmp_path / "samples", "a1", '{"x": "Причина"}', "unknown classes")
     assert p.exists() and p.name.endswith("_a1.json")
     assert "Причина" in p.read_text("utf-8")
+
+
+
+def test_prune_old_probes_and_orphan_responses(tmp_path):
+    from voe_explorer.net import FetchResult
+    db = Db(tmp_path / "voe.sqlite3")
+    now = datetime(2026, 10, 17, 12)
+    db.add_probe(now - timedelta(days=40), "probe", 200, 0.3, "ok")
+    db.add_probe(now - timedelta(days=2), "probe", 200, 0.3, "ok")
+    res = FetchResult("u", now, 200, 0.3, "{}", None)
+    db.add_response("gone", "schedule", res, "h")
+    db.add_response("kept", "schedule", res, "h")
+    db.add_response(None, "planned", res, "h")
+    db.prune(now, keep_address_ids={"kept"})
+    assert len(db.probes_between(now - timedelta(days=60), now)) == 1
+    assert db.responses("gone", "schedule") == [] and db.responses("kept", "schedule")
+    assert db.responses(None, "planned")

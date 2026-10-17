@@ -15,7 +15,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from .address_parse import parse_query, parse_voe_street
-from .health import segments, stats
+from .health import Health, segments, stats
 from .install import install_self
 from .models import ParseError, SavedAddress
 from .planned import city_name, parse_planned_html
@@ -25,6 +25,7 @@ from .voe_client import AcItem, VoeUnavailable
 
 VOE_DOWN = "Сайт VOE зараз не відповідає. Спробуйте ще раз за хвилину."
 GENERIC = "Щось пішло не так. Спробуйте ще раз."
+NO_INTERNET = "Немає інтернету. Перевірте підключення й спробуйте ще раз."
 
 
 def _safe(fn):
@@ -94,7 +95,21 @@ class Api:
 
     @_safe
     def resolve(self, text: str, city: dict) -> dict:
-        return _resolution(self._resolver.resolve(text, _item(city)))
+        res = self._resolver.resolve(text, _item(city))
+        if res.kind == "not_found":
+            # VOE sometimes answers an empty list while it is failing: don't call that "no such street"
+            state = self._service.check_voe()
+            if state == Health.OFFLINE:
+                return {"error": NO_INTERNET}
+            if state == Health.DOWN:
+                return {"error": VOE_DOWN}
+        return _resolution(res)
+
+    @_safe
+    def pick_house(self, city: dict, street: dict, house: dict, text: str | None = None) -> dict:
+        item = _item(street)
+        choice = StreetChoice(item, parse_voe_street(item.value))
+        return _resolution(self._resolver.remember_pick(_item(city), text or "", choice, _item(house)))
 
     @_safe
     def choose_street(self, city: dict, street: dict, house_text: str, text: str | None = None) -> dict:
@@ -133,6 +148,7 @@ class Api:
     @_safe
     def remove(self, id: str) -> dict:
         self._addresses.remove(id)
+        self._db.delete_responses(id)
         return {}
 
     @_safe

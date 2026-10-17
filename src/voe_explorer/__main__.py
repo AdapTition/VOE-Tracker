@@ -4,7 +4,7 @@ from __future__ import annotations
 import os
 import sys
 import threading
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 
 import webview
@@ -38,6 +38,7 @@ def main() -> None:
     addresses = AddressStore(app_dir / "addresses.json")
     memory = MemoryStore(app_dir / "memory.json")
     db = Db(app_dir / "voe.sqlite3")
+    db.prune(datetime.now(), {a.id for a in addresses.all()})
 
     client = VoeClient(Net())
     service = Service(client, Net(), addresses, db, app_dir / "samples")

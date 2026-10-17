@@ -207,6 +207,12 @@ class Service:
         with self._lock:
             self._health = (state, res.elapsed_s, res.at)
 
+    def check_voe(self) -> Health:
+        """Probe VOE right now (used when an answer looks empty)."""
+        self.run_probe()
+        with self._lock:
+            return self._health[0]
+
     def request_refresh(self) -> None:
         self._wake.set()
 

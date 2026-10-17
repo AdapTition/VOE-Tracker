@@ -79,3 +79,12 @@ def test_street_matches_tolerates_adjective_ending_and_partial_name():
     q = StreetName("вулиця", None, "ботанічний")
     assert street_matches(q, StreetName("вулиця", None, "ботанічна"))
     assert street_matches(StreetName(None, None, "коцюбинського"), StreetName("проспект", None, "михайла коцюбинського"))
+
+
+def test_street_name_starting_with_number():
+    q = parse_query("8 Березня 10")
+    assert q.house == "10"
+    assert street_matches(q.street, parse_voe_street("вулиця. 8 Березня"))
+    assert street_matches(parse_query("вул. 8 Березня, 10").street, parse_voe_street("вулиця. 8 Березня"))
+    assert not street_matches(q.street, parse_voe_street("вулиця. 9 Травня"))
+    assert parse_plain_street("вулиця 8 Березня") == parse_voe_street("вулиця. 8 Березня")
