@@ -79,3 +79,19 @@ def test_all_clear():
     s = derive_status(sched(lines=("За Вашою адресою наразі не зафіксовано аварійних та планових відключень.",)),
                       at(11), False, None, at(11))
     assert s.level == Level.ON and s.headline == "Світло є" and s.data_at == at(11)
+
+
+def test_no_positive_signal_is_never_on():
+    # message div with an error text and no table: nothing says the light is on
+    error_only = ParsedSchedule(False, None, ("Сталася помилка. Спробуйте пізніше.",), None, (), frozenset())
+    assert derive_status(error_only, at(11), False, None, at(11)).level == Level.POSSIBLE
+    empty = ParsedSchedule(False, None, (), None, (), frozenset())
+    assert derive_status(empty, at(11), False, None, at(11)).level == Level.POSSIBLE
+    # a table that has no slot for the current hour (no dated row for today)
+    other_day = ParsedSchedule(False, None, ("x",), None,
+                               (DaySchedule("пн 19.10", date(2026, 10, 19), False, (H.ON,) * 24),), frozenset())
+    assert derive_status(other_day, at(11), False, None, at(11)).level == Level.POSSIBLE
+    # the known all-clear text alone is a positive signal
+    clear = ParsedSchedule(False, None, ("За Вашою адресою наразі не зафіксовано аварійних та планових відключень.",),
+                           None, (), frozenset())
+    assert derive_status(clear, at(11), False, None, at(11)).level == Level.ON

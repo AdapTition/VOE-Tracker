@@ -27,6 +27,7 @@ class CardStatus:
 
 
 STALE_AFTER = timedelta(minutes=15)
+ALL_CLEAR = "не зафіксовано"
 HEADLINES = {
     Level.ON: "Світло є",
     Level.OFF: "Немає світла",
@@ -102,7 +103,9 @@ def derive_status(parsed: ParsedSchedule | None, fetched_at: datetime | None, pa
     if sched is not None:
         candidates.append(sched)
     if not candidates:
-        candidates.append((Level.ON, None, None, None))
+        # «Світло є» needs a positive signal: the all-clear text or an ON slot for this hour
+        all_clear = any(ALL_CLEAR in line.lower() for line in parsed.message_lines)
+        candidates.append((Level.ON, None, None, None) if all_clear else (Level.POSSIBLE, None, None, None))
 
     best = max(candidates, key=lambda c: _RANK[c[0]])  # max keeps the first of equals
     if best[0] == Level.ON:
