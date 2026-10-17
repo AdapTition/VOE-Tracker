@@ -64,7 +64,9 @@ class Resolver:
         exact = next((h for h in options if normalize_house(h.value) == house), None)
         if exact is None:
             return Resolution("choose_house", street=street, house_choices=options)
-        if remember_as:
+        # remember only if the text itself names this house, so the key never maps to another one
+        typed = parse_query(remember_as).house if remember_as else None
+        if typed and normalize_house(typed) == house:
             self.memory.put(memory_key(city.id, remember_as), {
                 "street": {"value": street.item.value, "id": street.item.id},
                 "house": {"value": exact.value, "id": exact.id},

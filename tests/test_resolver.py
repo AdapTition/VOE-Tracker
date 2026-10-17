@@ -96,3 +96,13 @@ def test_chosen_street_is_remembered():
 def test_not_found():
     r, _ = resolver()
     assert r.resolve("вул. Неіснуюча 1", CITY).kind == "not_found"
+
+
+def test_other_house_is_not_remembered_under_original_text():
+    r, client = resolver()
+    res = r.resolve("1-й пров. Ботанічний 3", CITY)
+    assert res.kind == "choose_house"
+    assert r.resolve_house(CITY, res.street, "20", remember_as="1-й пров. Ботанічний 3").kind == "found"
+    client.calls.clear()
+    again = r.resolve("1-й пров. Ботанічний 3", CITY)
+    assert again.kind == "choose_house" and client.calls  # asked VOE again, no silent house 20
