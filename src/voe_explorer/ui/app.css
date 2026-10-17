@@ -42,7 +42,9 @@ button { font: inherit; cursor: pointer; }
 }
 .banner button { border: 0; background: #1d1d1b; color: #fff; padding: 6px 12px; border-radius: 8px; }
 .banner .link { background: none; color: #6b4e16; }
-.banner .actions { display: flex; gap: 8px; align-items: center; flex-shrink: 0; white-space: nowrap; }
+.banner { flex-wrap: wrap; }
+.banner > span:first-child { flex: 1 1 200px; }
+.banner .actions { display: flex; gap: 8px; align-items: center; flex-shrink: 0; white-space: nowrap; margin-left: auto; }
 .banner.err { background: #fdecec; border-color: #f3c2c2; color: #8a1f1f; }
 
 .card {

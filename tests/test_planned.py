@@ -74,9 +74,9 @@ def test_months_to_fetch():
 
 
 def test_kind_word_after_name_matches_voe_street():
-    # planned page: "вулиця Хмельницьке шосе 81,…"; VOE autocomplete: "шосе. Хмельницьке"
+    # planned page and VOE autocomplete both say "вулиця Хмельницьке шосе"; the user may type "Хмельницьке шосе"
     works = parse_planned_html(HTML)
-    a = address("шосе. Хмельницьке", "81")
+    a = address("вулиця. Хмельницьке шосе", "81")
     assert "2827318" in {w.id for w in works_for_address(a, works, datetime(2026, 10, 17))}
     assert "2810440" in {w.id for w in works_for_address(a, works, datetime(2026, 10, 24))}
     assert works_for_address(address("вулиця. Хмельницька", "81"), works, datetime(2026, 10, 17)) == []

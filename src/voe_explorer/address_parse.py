@@ -57,6 +57,15 @@ def normalize_house(text: str) -> str:
     return re.sub(r"(\d)-(\D)", r"\1\2", s)
 
 
+def _fold_kind(street: StreetName) -> StreetName:
+    """VOE writes "вулиця. Хмельницьке шосе"; people write "Хмельницьке шосе" or "шосе Хмельницьке".
+    A plain "вулиця" whose name ends with another kind word is that kind."""
+    words = street.name.split()
+    if street.kind in (None, "вулиця") and len(words) > 1 and _kind_of(words[-1]):
+        return StreetName(_kind_of(words[-1]), street.ordinal, " ".join(words[:-1]))
+    return street
+
+
 def _split_street(tokens: list[str]) -> StreetName:
     kind = ordinal = None
     name: list[str] = []
@@ -72,7 +81,7 @@ def _split_street(tokens: list[str]) -> StreetName:
             ordinal = int(tok)
         else:
             name.append(tok)
-    return StreetName(kind, ordinal, " ".join(name))
+    return _fold_kind(StreetName(kind, ordinal, " ".join(name)))
 
 
 def parse_query(text: str) -> AddressQuery:
@@ -105,17 +114,12 @@ def parse_voe_street(value: str) -> StreetName:
     m = re.match(r"^(\d+)(?:-?(?:й|ий|ій|а|я|е))?\s+(\S.*)$", s)
     if m:
         ordinal, s = int(m.group(1)), m.group(2)
-    return StreetName(kind, ordinal, s)
+    return _fold_kind(StreetName(kind, ordinal, s))
 
 
 def parse_plain_street(text: str) -> StreetName:
-    """Planned-works format: "вулиця Стрілецька", "* 1-й Маріі ...", "вулиця Хмельницьке шосе"."""
-    street = _split_street(_clean(text).split())
-    words = street.name.split()
-    # "вулиця Хмельницьке шосе": the generic "вулиця" yields to the kind word inside the name
-    if street.kind == "вулиця" and len(words) > 1 and _kind_of(words[-1]):
-        return StreetName(_kind_of(words[-1]), street.ordinal, " ".join(words[:-1]))
-    return street
+    """Planned-works format: "вулиця Стрілецька", "* 1-й Маріі ..."."""
+    return _split_street(_clean(text).split())
 
 
 def search_stem(street: StreetName) -> str:

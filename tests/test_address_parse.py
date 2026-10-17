@@ -88,3 +88,21 @@ def test_street_name_starting_with_number():
     assert street_matches(parse_query("вул. 8 Березня, 10").street, parse_voe_street("вулиця. 8 Березня"))
     assert not street_matches(q.street, parse_voe_street("вулиця. 9 Травня"))
     assert parse_plain_street("вулиця 8 Березня") == parse_voe_street("вулиця. 8 Березня")
+
+
+# live VOE autocomplete for "Хмель" (2026-10-17)
+HMEL = ["вулиця. Богдана Хмельницького", "вулиця. Хмельницьке шосе", "провулок. 1-й Хмельницьке шосе",
+        "провулок. 2-й Хмельницьке шосе", "провулок. Хмельницьке шосе"]
+
+
+def _hits(text):
+    q = parse_query(text).street
+    return [v for v in HMEL if street_matches(q, parse_voe_street(v))]
+
+
+def test_shose_named_as_vulytsia_by_voe():
+    assert _hits("Хмельницьке шосе 81") == ["вулиця. Хмельницьке шосе"]
+    assert _hits("вул. Хмельницьке шосе, 81") == ["вулиця. Хмельницьке шосе"]
+    assert _hits("шосе Хмельницьке 81") == ["вулиця. Хмельницьке шосе"]
+    assert _hits("1-й пров. Хмельницьке шосе 5") == ["провулок. 1-й Хмельницьке шосе"]
+    assert parse_plain_street("вулиця Хмельницьке шосе") == parse_voe_street("вулиця. Хмельницьке шосе")
