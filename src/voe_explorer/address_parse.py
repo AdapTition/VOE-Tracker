@@ -108,8 +108,13 @@ def parse_voe_street(value: str) -> StreetName:
 
 
 def parse_plain_street(text: str) -> StreetName:
-    """Planned-works format: "вулиця Стрілецька", "* 1-й Маріі ..."."""
-    return _split_street(_clean(text).split())
+    """Planned-works format: "вулиця Стрілецька", "* 1-й Маріі ...", "вулиця Хмельницьке шосе"."""
+    street = _split_street(_clean(text).split())
+    words = street.name.split()
+    # "вулиця Хмельницьке шосе": the generic "вулиця" yields to the kind word inside the name
+    if street.kind == "вулиця" and len(words) > 1 and _kind_of(words[-1]):
+        return StreetName(_kind_of(words[-1]), street.ordinal, " ".join(words[:-1]))
+    return street
 
 
 def search_stem(street: StreetName) -> str:

@@ -71,3 +71,12 @@ def test_city_name():
 def test_months_to_fetch():
     assert months_to_fetch(datetime(2026, 10, 17)) == [(2026, 10)]
     assert months_to_fetch(datetime(2026, 12, 28)) == [(2026, 12), (2027, 1)]
+
+
+def test_kind_word_after_name_matches_voe_street():
+    # planned page: "вулиця Хмельницьке шосе 81,…"; VOE autocomplete: "шосе. Хмельницьке"
+    works = parse_planned_html(HTML)
+    a = address("шосе. Хмельницьке", "81")
+    assert "2827318" in {w.id for w in works_for_address(a, works, datetime(2026, 10, 17))}
+    assert "2810440" in {w.id for w in works_for_address(a, works, datetime(2026, 10, 24))}
+    assert works_for_address(address("вулиця. Хмельницька", "81"), works, datetime(2026, 10, 17)) == []
