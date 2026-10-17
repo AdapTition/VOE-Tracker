@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 
 from voe_explorer.install import install_self, install_target, is_transient_location
-from voe_explorer.updates import UpdateInfo, check_latest, parse_version
+from voe_explorer.updates import UpdateInfo, cached_update, check_latest, parse_version
 
 ENV = {"TEMP": r"C:\Users\u\AppData\Local\Temp", "TMP": r"C:\Users\u\AppData\Local\Temp",
        "USERPROFILE": r"C:\Users\u", "LOCALAPPDATA": r"C:\Users\u\AppData\Local"}
@@ -55,3 +55,19 @@ def test_install_self_copies_and_creates_shortcut(tmp_path):
     assert len(commands) == 1 and commands[0][0] == "powershell"
     script = commands[0][-1]
     assert "CreateShortcut" in script and "VOE Explorer.lnk" in script and str(target) in script
+
+
+class _Mem(dict):
+    def put(self, key, value):
+        self[key] = value
+
+
+def test_same_day_cache_ignores_version_already_installed():
+    mem = _Mem()
+    fetch = lambda url: json.dumps({"tag_name": "v0.2.0", "html_url": "https://x"})
+    assert cached_update(mem, "me/r", "0.1.0", "2026-10-17", fetch) == {"version": "0.2.0", "url": "https://x"}
+    # user installs 0.2.0 the same day: the cached 0.2.0 is not newer, no banner, no refetch
+    no_fetch = lambda url: (_ for _ in ()).throw(AssertionError("must not fetch"))
+    assert cached_update(mem, "me/r", "0.2.0", "2026-10-17", no_fetch) is None
+    # next day: fetched again
+    assert cached_update(mem, "me/r", "0.2.0", "2026-10-18", fetch) is None

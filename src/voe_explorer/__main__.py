@@ -16,7 +16,7 @@ from .net import Net
 from .resolver import Resolver
 from .service import Service
 from .storage import AddressStore, Db, MemoryStore
-from .updates import check_latest
+from .updates import cached_update
 from .voe_client import VoeClient
 
 
@@ -27,14 +27,7 @@ def ui_path() -> Path:
 
 
 def check_updates(service: Service, memory: MemoryStore) -> None:
-    seen = memory.get("__update_checked") or {}
-    today = date.today().isoformat()
-    if seen.get("date") == today:
-        info = seen.get("info")
-    else:
-        found = check_latest(config.RELEASES_REPO, __version__)
-        info = {"version": found.version, "url": found.url} if found else None
-        memory.put("__update_checked", {"date": today, "info": info})
+    info = cached_update(memory, config.RELEASES_REPO, __version__, date.today().isoformat())
     if info:
         service.update = info
 

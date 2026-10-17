@@ -43,3 +43,18 @@ def check_latest(repo: str, current: str, fetch: Callable[[str], str | None] = h
     if parse_version(tag) > parse_version(current):
         return UpdateInfo(tag.lstrip("vV"), url)
     return None
+
+
+def cached_update(memory, repo: str, current: str, today: str,
+                  fetch: Callable[[str], str | None] = http_fetch) -> dict | None:
+    """At most one check per day; a cached result is re-compared with the running version."""
+    seen = memory.get("__update_checked") or {}
+    if seen.get("date") == today:
+        info = seen.get("info")
+    else:
+        found = check_latest(repo, current, fetch)
+        info = {"version": found.version, "url": found.url} if found else None
+        memory.put("__update_checked", {"date": today, "info": info})
+    if info and parse_version(info["version"]) > parse_version(current):
+        return info
+    return None
