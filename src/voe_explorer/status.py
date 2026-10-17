@@ -89,7 +89,7 @@ def derive_status(parsed: ParsedSchedule | None, fetched_at: datetime | None, pa
                   planned_now: PlannedWork | None, now: datetime) -> CardStatus:
     if parse_failed:
         return _make(Level.SITE_CHANGED, None, None, None, fetched_at)
-    if parsed is None or fetched_at is None or now - fetched_at > STALE_AFTER:
+    if parsed is None or fetched_at is None or abs(now - fetched_at) > STALE_AFTER:  # abs: clock moved back (DST)
         return _make(Level.STALE, None, None, None, fetched_at)
 
     candidates = []

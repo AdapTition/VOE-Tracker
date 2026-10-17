@@ -100,10 +100,99 @@ def test_never_fetched_is_loading_and_stale(env):
 
 def test_parse_error_marks_site_changed_and_saves_sample(env):
     add(env)
-    env.client.schedules.append(ScheduleFetch(ok("[]"), "[]"))
+    env.client.schedules += [ScheduleFetch(ok("[]"), "[]"), ScheduleFetch(ok("[]"), "[]")]
     env.svc.refresh_address("a1")
+    env.svc.refresh_address("a1")      # two bad answers in a row: the site really changed
     assert env.svc.snapshot()["cards"][0]["level"] == "site_changed"
+    assert len(list(env.samples.iterdir())) == 2
+
+
+def test_single_bad_answer_keeps_last_good_data(env):
+    add(env)
+    env.client.schedules += [ScheduleFetch(ok(EMERGENCY), EMERGENCY), ScheduleFetch(ok("[]"), "[]")]
+    env.svc.refresh_address("a1")
+    env.clock.t += timedelta(minutes=5)
+    env.svc.refresh_address("a1")      # one transient bad page (e.g. Cloudflare) is not "site changed"
+    card = env.svc.snapshot()["cards"][0]
+    assert card["level"] == "off" and card["data_at"] == "11:00"
+
+
+def test_site_changed_then_network_failure_becomes_stale(env):
+    add(env)
+    env.client.schedules += [ScheduleFetch(ok("[]"), "[]"), ScheduleFetch(ok("[]"), "[]")]
+    env.svc.refresh_address("a1")
+    env.svc.refresh_address("a1")
+    env.clock.t += timedelta(minutes=20)
+    env.client.schedules.append(ScheduleFetch(failed(env.clock.t), None))
+    env.svc.refresh_address("a1")
+    assert env.svc.snapshot()["cards"][0]["level"] == "stale"
+
+
+def test_page_without_form_is_saved_as_sample(env):
+    add(env)
+    env.client.schedules.append(ScheduleFetch(ok("<html>no form here</html>"), None))
+    env.svc.refresh_address("a1")
     assert len(list(env.samples.iterdir())) == 1
+
+
+def test_next_morning_stale_card_shows_no_yesterday_as_today(env):
+    add(env)
+    env.client.schedules.append(ScheduleFetch(ok(EMERGENCY), EMERGENCY))
+    env.svc.refresh_address("a1")
+    env.clock.t = datetime(2026, 10, 18, 9, 0)
+    card = env.svc.snapshot()["cards"][0]
+    assert card["level"] == "stale" and card["today"] is None and card["other_days"] == []
+    assert card["data_at"] == "11:00 вчора"
+    env.clock.t = datetime(2026, 10, 20, 9, 0)
+    assert env.svc.snapshot()["cards"][0]["data_at"] == "11:00, 17.10"
+
+
+def test_clock_moved_back_counts_as_stale(env):
+    # DST: 03:50 fetched, clock jumps back to 03:05 -> the data's age is unknown, must not look fresh
+    add(env)
+    env.clock.t = datetime(2026, 10, 25, 3, 50)
+    env.client.schedules.append(ScheduleFetch(ok(EMERGENCY, at=env.clock.t), EMERGENCY))
+    env.svc.refresh_address("a1")
+    env.clock.t = datetime(2026, 10, 25, 3, 5)
+    assert env.svc.snapshot()["cards"][0]["level"] == "stale"
+
+
+def test_stale_cards_wake_refresh_after_sleep(env):
+    add(env)
+    env.client.schedules.append(ScheduleFetch(ok(EMERGENCY), EMERGENCY))
+    env.svc.refresh_all()
+    env.svc.snapshot()
+    assert not env.svc._wake.is_set()          # fresh: nothing to do
+    env.clock.t += timedelta(hours=3)          # laptop slept
+    env.svc.snapshot()
+    assert env.svc._wake.is_set()
+
+
+def test_health_indicator_goes_unknown_when_old(env):
+    from voe_explorer.health import Health
+    env.svc._health = (Health.OK, 0.3, env.clock.t)
+    assert env.svc.snapshot()["health"]["state"] == "ok"
+    env.clock.t += timedelta(hours=3)
+    h = env.svc.snapshot()["health"]
+    assert h["state"] == "unknown" and h["text"] == "Перевіряємо VOE…"
+    assert env.svc._probe_wake.is_set()
+
+
+def test_older_answer_never_overwrites_newer(env):
+    add(env)
+    raw = synthetic_json()
+    calls = []
+
+    def schedule(addr):
+        calls.append(1)
+        if len(calls) == 1:          # while the first request is in flight, a second one starts and finishes
+            env.svc.refresh_address("a1")
+            return ScheduleFetch(ok(raw), raw)
+        return ScheduleFetch(ok(EMERGENCY), EMERGENCY)
+
+    env.client.schedule = schedule
+    env.svc.refresh_address("a1")
+    assert env.svc.snapshot()["cards"][0]["reason"] == "Аварійне відключення"
 
 
 def test_unknown_classes_save_sample(env):
@@ -131,6 +220,15 @@ def test_planned_line_on_card(env):
     assert {"text": "вт 20.10, 09:00–16:30"} in card["planned"]
     assert card["planned"].count({"text": "вт 20.10, 09:00–16:30"}) == 1   # two VOE records, same slot
     assert env.db.responses(None, "planned")
+
+
+def test_cloudflare_page_on_ajax_request_is_down(env):
+    hook = env.client.net.on_attempt
+    url = "https://www.voe.com.ua/disconnection/detailed?ajax_form=1&_wrapper_format=drupal_ajax"
+    hook(FetchResult(url, datetime(2026, 10, 17, 11, 0), 200, 0.4, "<html>Cloudflare error</html>", None))
+    hook(FetchResult(url, datetime(2026, 10, 17, 11, 1), 200, 0.4, EMERGENCY, None))
+    rows = env.db.probes_between(datetime(2026, 10, 17), datetime(2026, 10, 18))
+    assert [s for _, s, _ in rows] == ["down", "ok"]
 
 
 def test_http_attempts_recorded_but_network_errors_left_to_probe(env):
