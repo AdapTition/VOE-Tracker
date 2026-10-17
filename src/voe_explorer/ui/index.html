@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>VOE Explorer</title>
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <header class="top">
+    <div class="title">Світло</div>
+    <button id="health" class="health" type="button" title="Історія роботи сайту VOE">
+      <span class="dot"></span><span class="health-text">Перевіряємо VOE…</span>
+    </button>
+  </header>
+
+  <div id="banners"></div>
+  <main id="cards"></main>
+  <button id="add" class="add" type="button">+ Додати адресу</button>
+
+  <!-- Add address -->
+  <div id="add-sheet" class="overlay" hidden>
+    <div class="sheet">
+      <div class="sheet-head"><h2>Нова адреса</h2><button class="x" data-close>×</button></div>
+      <label class="field">Назва<input id="f-label" placeholder="Наприклад: Батьки" maxlength="40"></label>
+      <div class="field">Місто
+        <div class="city-row">
+          <span id="f-city-name">Вінниця</span>
+          <button id="f-city-change" class="link" type="button">змінити</button>
+        </div>
+        <div id="f-city-search" hidden>
+          <input id="f-city-q" placeholder="Почніть вводити назву міста чи села">
+          <div id="f-city-results" class="choices"></div>
+        </div>
+      </div>
+      <label class="field">Адреса<input id="f-text" placeholder="Наприклад: 1-й пров. Ботанічний, 10"></label>
+      <button id="f-find" class="primary" type="button">Знайти</button>
+      <div id="f-result"></div>
+    </div>
+  </div>
+
+  <!-- Rename -->
+  <div id="rename-sheet" class="overlay" hidden>
+    <div class="sheet small">
+      <div class="sheet-head"><h2>Перейменувати</h2><button class="x" data-close>×</button></div>
+      <input id="r-label" maxlength="40">
+      <button id="r-save" class="primary" type="button">Зберегти</button>
+    </div>
+  </div>
+
+  <!-- Health history -->
+  <div id="health-sheet" class="overlay" hidden>
+    <div class="sheet">
+      <div class="sheet-head"><h2>Сайт VOE</h2><button class="x" data-close>×</button></div>
+      <div class="seg-switch">
+        <button data-window="day" class="on" type="button">День</button>
+        <button data-window="week" type="button">Тиждень</button>
+      </div>
+      <div id="h-bar" class="hbar"></div>
+      <div id="h-axis" class="haxis"></div>
+      <div class="hlegend">
+        <span><i class="sw ok"></i>відповідає</span><span><i class="sw slow"></i>повільно</span>
+        <span><i class="sw down"></i>не відповідає</span><span><i class="sw offline"></i>немає інтернету</span>
+        <span><i class="sw nodata"></i>немає даних (програма була закрита)</span>
+      </div>
+      <p id="h-stats" class="stats"></p>
+      <button id="h-raw" class="link" type="button">Відповіді VOE на перевірки</button>
+    </div>
+  </div>
+
+  <!-- Raw responses -->
+  <div id="raw-sheet" class="overlay" hidden>
+    <div class="sheet wide">
+      <div class="sheet-head"><h2>Відповідь VOE</h2><button class="x" data-close>×</button></div>
+      <div class="seg-switch" id="raw-kinds">
+        <button data-kind="schedule" class="on" type="button">Графік адреси</button>
+        <button data-kind="planned" type="button">Планові роботи</button>
+        <button data-kind="probe" type="button">Перевірки сайту</button>
+      </div>
+      <div class="raw-body">
+        <ul id="raw-list" class="raw-list"></ul>
+        <div id="raw-detail" class="raw-detail"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Legend -->
+  <div id="legend" class="popover" hidden>
+    <div class="lg"><i class="sw h-on"></i>Світло є за графіком</div>
+    <div class="lg"><i class="sw h-off"></i>Світла немає — відключення підтверджене</div>
+    <div class="lg"><i class="sw h-possible"></i>Жовтий — відключення можливе, але не підтверджене: світло може бути, а може й ні</div>
+    <div class="lg"><i class="sw h-off_first_half"></i>Світла не буде першу половину години (або другу — половинка з іншого боку)</div>
+    <div class="lg"><i class="sw h-unknown"></i>Програма не впізнала цей стан — дивіться «⋯ → Відповідь VOE»</div>
+    <p class="note">Аварійні відключення в смужці не видно — про них пише рядок статусу над нею.</p>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

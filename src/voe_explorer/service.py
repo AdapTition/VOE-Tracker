@@ -189,7 +189,7 @@ class Service:
                     "data_at": f"{st.data_at:%H:%M}" if st.data_at else None,
                     "today": {"label": today.label, "hours": [h.value for h in today.hours]} if today else None,
                     "other_days": [{"label": d.label, "hours": [h.value for h in d.hours]} for d in others],
-                    "planned": [{"text": _fmt_work(w)} for w in works],
+                    "planned": [{"text": t} for t in dict.fromkeys(_fmt_work(w) for w in works)],
                     "loading": card.loading,
                 })
             if self._health:

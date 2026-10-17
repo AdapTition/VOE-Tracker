@@ -129,6 +129,7 @@ def test_planned_line_on_card(env):
     env.svc.refresh_planned()
     card = env.svc.snapshot()["cards"][0]
     assert {"text": "вт 20.10, 09:00–16:30"} in card["planned"]
+    assert card["planned"].count({"text": "вт 20.10, 09:00–16:30"}) == 1   # two VOE records, same slot
     assert env.db.responses(None, "planned")
 
 
