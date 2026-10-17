@@ -57,6 +57,18 @@ class AddressQuery:
     house: str | None
 
 
+@dataclass
+class SavedAddress:
+    id: str
+    label: str
+    city_value: str
+    city_id: str
+    street_value: str
+    street_id: str
+    house_value: str
+    house_id: str
+
+
 @dataclass(frozen=True)
 class PlannedWork:
     id: str
