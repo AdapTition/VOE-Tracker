@@ -139,3 +139,17 @@ def test_http_attempts_recorded_but_network_errors_left_to_probe(env):
     hook(FetchResult("u", datetime(2026, 10, 17, 11, 1), None, 40.0, None, "timeout"))
     rows = env.db.probes_between(datetime(2026, 10, 17), datetime(2026, 10, 18))
     assert [s for _, s, _ in rows] == ["ok"]
+
+
+def test_failed_planned_fetch_retries_soon(env, monkeypatch):
+    add(env)
+    env.client.planned_form_page = lambda: failed(env.clock())
+    assert env.svc.refresh_planned() is False            # nothing fetched: VOE down or no Wi-Fi yet
+    env.client.planned_form_page = lambda: ok(PLANNED)
+    assert env.svc.refresh_planned() is True
+
+    # the loop waits the short retry interval after a failed cycle, the long one after success
+    waits, results = [], [False, True]
+    monkeypatch.setattr(env.svc._stop, "wait", lambda t: (waits.append(t), len(waits) == 2)[1] and env.svc._stop.set())
+    env.svc._loop(lambda: results.pop(0), interval=10800, retry=300)
+    assert waits == [300, 10800]

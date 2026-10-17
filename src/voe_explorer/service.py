@@ -139,7 +139,7 @@ class Service:
                 return
             self.refresh_address(addr.id)
 
-    def refresh_planned(self) -> None:
+    def refresh_planned(self) -> bool:
         if not self._regions:
             page = self.client.planned_form_page()
             if page.ok:
@@ -158,6 +158,8 @@ class Service:
         if any_ok or not regions:
             with self._lock:
                 self._works = works
+        # False: nothing could be fetched (VOE down, no Wi-Fi yet) -> the loop retries soon
+        return any_ok or (not regions and (bool(self._regions) or not self.addresses.all()))
 
     def run_probe(self) -> None:
         state, res = probe(self.net, self.internet_check)
@@ -200,23 +202,25 @@ class Service:
             return {"health": health, "cards": cards, "update": self.update, "install_offer": self.install_offer}
 
     # --- loops ---------------------------------------------------------------
-    def _loop(self, fn: Callable[[], None], interval: float, wake: threading.Event | None = None) -> None:
+    def _loop(self, fn: Callable[[], object], interval: float, wake: threading.Event | None = None,
+              retry: float | None = None) -> None:
         while not self._stop.is_set():
             try:
-                fn()
+                failed = fn() is False
             except Exception:  # a bad cycle must never kill the loop
-                pass
+                failed = True
+            wait = retry if (failed and retry is not None) else interval
             if wake is not None:
-                wake.wait(interval)
+                wake.wait(wait)
                 wake.clear()
             else:
-                self._stop.wait(interval)
+                self._stop.wait(wait)
 
     def start(self) -> None:
-        for fn, interval, wake in ((self.refresh_all, config.REFRESH_S, self._wake),
-                                   (self.run_probe, config.PROBE_S, None),
-                                   (self.refresh_planned, config.PLANNED_S, None)):
-            t = threading.Thread(target=self._loop, args=(fn, interval, wake), daemon=True)
+        for fn, interval, wake, retry in ((self.refresh_all, config.REFRESH_S, self._wake, None),
+                                          (self.run_probe, config.PROBE_S, None, None),
+                                          (self.refresh_planned, config.PLANNED_S, None, config.REFRESH_S)):
+            t = threading.Thread(target=self._loop, args=(fn, interval, wake, retry), daemon=True)
             t.start()
             self._threads.append(t)
 
