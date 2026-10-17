@@ -55,3 +55,14 @@ class StreetName:
 class AddressQuery:
     street: StreetName
     house: str | None
+
+
+@dataclass(frozen=True)
+class PlannedWork:
+    id: str
+    kind: str
+    status: str
+    start: datetime
+    end: datetime
+    settlement: str
+    streets: tuple[tuple[StreetName, tuple[str, ...]], ...]
